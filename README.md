@@ -1,119 +1,81 @@
-# LibreTV - 免费在线视频搜索与观看平台
+# LibreTV Revival
 
-<div align="center">
-  <img src="image/logo.png" alt="LibreTV Logo" width="120">
-  <br>
-  <p><strong>自由观影，畅享精彩</strong></p>
-</div>
+[![CI](https://github.com/wxst/LibreTV/actions/workflows/ci.yml/badge.svg)](https://github.com/wxst/LibreTV/actions/workflows/ci.yml)
 
-## 📺 项目简介
+LibreTV 是一个轻量级的在线视频搜索与观看工具，适合个人学习、自部署和私有使用。本仓库是对已归档上游 [LibreSpark/LibreTV](https://github.com/LibreSpark/LibreTV) 的维护续作，重点放在可部署、可维护、可验证，而不是运营公开影视服务。
 
-LibreTV 是一个轻量级、免费的在线视频搜索与观看平台，提供来自多个视频源的内容搜索与播放服务。无需注册，即开即用，支持多种设备访问。项目结合了前端技术和后端代理功能，可部署在支持服务端功能的各类网站托管服务上。**项目门户**： [libretv.is-an.org](https://libretv.is-an.org)
+English positioning for GitHub search: LibreTV Revival is a maintained self-hosted fork of archived LibreSpark/LibreTV, focused on Cloudflare Pages, Pages Functions proxy, PWA installability, MacCMS VOD API sources, source health checks, diagnostics, and playback URL fixes.
 
-本项目基于 [bestK/tv](https://github.com/bestK/tv) 进行重构与增强。
+当前维护版已经修复和补齐：
 
-<details>
-  <summary>点击查看项目截图</summary>
-  <img src="https://github.com/user-attachments/assets/df485345-e83b-4564-adf7-0680be92d3c7" alt="项目截图" style="max-width:600px">
-</details>
+- Cloudflare Pages 根目录静态部署与 Pages Functions 代理。
+- 默认视频源筛选、无效源移除、播放直链优先选择。
+- 封面图片规范化、无 referrer 加载和代理 fallback。
+- 可安装 PWA 与离线应用壳。
+- 源健康检查、播放错误分类、诊断页和首次使用引导。
+- 版本化配置导入导出，支持旧配置迁移。
+- 自动化测试和版本规则。
 
-## 🥇 感谢赞助
+如果你来自上游仓库，建议先阅读 [MIGRATION.md](MIGRATION.md)。它覆盖没源、不能播放、Cloudflare Pages、密码和代理等常见迁移问题。本仓库只把用户导向代码和文档，不提供公开演示站点。
 
-- **[YXVM](https://yxvm.com)**  
-- **[ZMTO/VTEXS](https://zmto.com)**
+## 上游迁移入口
 
-## 🚀 快速部署
+- 迁移 FAQ: [MIGRATION.md](MIGRATION.md)
+- 讨论入口: [GitHub Discussions](https://github.com/wxst/LibreTV/discussions/9)
+- 可复现问题: [GitHub Issues](https://github.com/wxst/LibreTV/issues)
+- 最新版本: [GitHub Releases](https://github.com/wxst/LibreTV/releases)
 
-选择以下任一平台，点击一键部署按钮，即可快速创建自己的 LibreTV 实例：
+建议先在 Discussions 里确认部署、源和代理配置问题；确认是代码缺陷后再开 Issue。提交问题时不要粘贴密码、令牌、私人源、完整代理链接或公开视频实例地址。
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FLibreSpark%2FLibreTV)  
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/LibreSpark/LibreTV)  
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/LibreSpark/LibreTV)
-[![使用 EdgeOne Pages 部署](https://cdnstatic.tencentcs.com/edgeone/pages/deploy.svg)](https://edgeone.ai/pages/new?repository-url=https://github.com/LibreSpark/LibreTV)
+## 重要声明
 
-## ⚠️ 安全与隐私提醒
+- 本项目只提供视频搜索与播放工具代码，不存储、上传、分发任何视频内容。
+- 本项目仅供学习、研究和个人自部署使用，不建议公开运营实例。
+- 部署时必须设置 `PASSWORD` 或 `PASSWORD_HASH`，避免实例被他人公开访问。
+- 所有第三方 API 源的可用性、合法性和内容风险由部署者自行判断。
+- API、代理、m3u8、视频分片保持 network-only，不做离线视频缓存。
 
-### 🔒 强烈建议设置密码保护
+## 快速开始
 
-为了您的安全和避免潜在的法律风险，我们**强烈建议**在部署时设置密码保护：
+### 本地开发
 
-- **避免公开访问**：不设置密码的实例任何人都可以访问，可能被恶意利用
-- **防范版权风险**：公开的视频搜索服务可能面临版权方的投诉举报
-- **保护个人隐私**：设置密码可以限制访问范围，保护您的使用记录
+```bash
+npm install
+npm run dev
+```
 
-### 📝 部署建议
-
-1. **设置环境变量 `PASSWORD`**：为您的实例设置一个强密码
-2. **仅供个人使用**：请勿将您的实例链接公开分享或传播
-3. **遵守当地法律**：请确保您的使用行为符合当地法律法规
-
-### 🚨 重要声明
-
-- 本项目仅供学习和个人使用
-- 请勿将部署的实例用于商业用途或公开服务
-- 如因公开分享导致的任何法律问题，用户需自行承担责任
-- 项目开发者不对用户的使用行为承担任何法律责任
-
-## ⚠️ 请勿使用 Pull Bot 自动同步
-
-Pull Bot 会反复触发无效的 PR 和垃圾邮件，严重干扰项目维护。作者可能会直接拉黑所有 Pull Bot 自动发起的同步请求的仓库所有者。
-
-**推荐做法：**
-
-建议在 fork 的仓库中启用本仓库自带的 GitHub Actions 自动同步功能（见 `.github/workflows/sync.yml`）。 
-
-如需手动同步主仓库更新，也可以使用 GitHub 官方的 [Sync fork](https://docs.github.com/cn/github/collaborating-with-issues-and-pull-requests/syncing-a-fork) 功能。
-
-
-## 📋 详细部署指南
+默认访问 `http://localhost:8080`。完整播放和图片代理功能需要使用 `npm run dev` 或 `npm start` 启动 Node.js 服务；简单静态服务器无法提供代理能力。
 
 ### Cloudflare Pages
 
-1. Fork 或克隆本仓库到您的 GitHub 账户
-2. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/)，进入 Pages 服务
-3. 点击"创建项目"，连接您的 GitHub 仓库
-4. 使用以下设置：
-   - 构建命令：留空（无需构建）
-   - 输出目录：留空（默认为根目录）
-5. **⚠️ 重要：在"设置" > "环境变量"中添加 `PASSWORD` 变量**
-6. **可选：在"Settings" > "Environment Variables"中添加 `ADMINPASSWORD` 变量**
-7. 点击"保存并部署"
-
-### Vercel
-
-1. Fork 或克隆本仓库到您的 GitHub/GitLab 账户
-2. 登录 [Vercel](https://vercel.com/)，点击"New Project"
-3. 导入您的仓库，使用默认设置
-4. **⚠️ 重要：在"Settings" > "Environment Variables"中添加 `PASSWORD` 变量**
-5. **可选：在"Settings" > "Environment Variables"中添加 `ADMINPASSWORD` 变量**
-6. 点击"Deploy"
-7. 可选：在"Settings" > "Environment Variables"中配置密码保护和设置按钮密码保护
-
-### Render
-
-1. Fork 或克隆本仓库到您的 GitHub 账户
-2. 登录 [Render](https://render.com/)，点击 "New Web Service"
-3. 选择您的仓库，Render 会自动检测到 `render.yaml` 配置文件
-4. 保持默认设置（无需设置环境变量，默认不启用密码保护）
-5. 点击 "Create Web Service"，等待部署完成
-6. 部署成功后即可访问您的 LibreTV 实例
-
-> 如需启用密码保护，可在 Render 控制台的环境变量中手动添加 `PASSWORD` 和/或 `ADMINPASSWORD`。
+1. Fork 或克隆本仓库。
+2. 在 Cloudflare Pages 中连接仓库。
+3. 构建设置保持静态根目录部署：
+   - Build command: 留空
+   - Build output directory: 留空
+   - Root directory: 留空
+4. 在 Pages 环境变量中设置：
+   - `PASSWORD`：普通密码，部署端会注入前端并用于代理鉴权。
+   - 或 `PASSWORD_HASH`：SHA-256 哈希形式，适合不暴露明文密码的部署。
+5. 如果不想暴露非生产预览入口，将 Preview deployments 设置为 `None`，并关闭 PR comments。
+6. 部署后检查：
+   - `/VERSION.txt`
+   - `/manifest.json`
+   - `/service-worker.js`
+   - 未授权访问 `/proxy/...` 应返回 401。
 
 ### Docker
-```
+
+```bash
 docker run -d \
   --name libretv \
   --restart unless-stopped \
   -p 8899:8080 \
   -e PASSWORD=your_password \
-  -e ADMINPASSWORD=your_adminpassword \
   bestzwei/libretv:latest
 ```
 
 ### Docker Compose
-
-`docker-compose.yml` 文件：
 
 ```yaml
 services:
@@ -121,102 +83,108 @@ services:
     image: bestzwei/libretv:latest
     container_name: libretv
     ports:
-      - "8899:8080" # 将内部 8080 端口映射到主机的 8899 端口
+      - "8899:8080"
     environment:
-      - PASSWORD=${PASSWORD:-your_password} # 可将 your_password 修改为你想要的密码，默认为 your_password
-      - ADMINPASSWORD=${PASSWORD:-your_adminpassword} # 可将 your_adminpassword 修改为你想要的密码，默认为 your_adminpassword
+      - PASSWORD=your_password
     restart: unless-stopped
 ```
-启动 LibreTV：
+
+## 默认源策略
+
+默认源只保留通过近期检查的标准 MacCMS VOD API 源。当前默认选中：
+
+- 影视工厂
+- 极速资源
+- 无尽资源
+- 猫眼资源
+
+其他已验证但未默认选中的源会保留在资源列表中，方便用户手动切换。每次调整默认源都需要：
+
+- 验证搜索、详情和至少一个直接可播放 m3u8。
+- 移除明显无效、403、返回 HTML 或不支持搜索的源。
+- 更新测试和版本号。
+
+## PWA
+
+LibreTV 可以安装为 Web App。安装后会以 standalone 窗口打开。离线时只提供应用壳和离线提示页，搜索、详情、代理和播放仍然需要网络。
+
+PWA 相关文件：
+
+- `manifest.json`
+- `service-worker.js`
+- `offline.html`
+- `image/icon-192.png`
+- `image/icon-512-maskable.png`
+
+## 源健康与诊断
+
+设置面板可以检测全部内置源和自定义源的搜索、详情和 m3u8 可访问性，并缓存一份本地报告。诊断页位于 `/diagnostics.html`，用于检查密码保护、代理状态、PWA 状态和源状态，不显示密钥、令牌或密码。
+
+配置导出格式当前为 `LibreTV-Settings` `2.0.0`。导入旧版 `1.0.0` 配置时会校验哈希、过滤未知字段，并提示迁移结果。
+
+## 版本和发布规则
+
+每次用户可见变更都必须同时更新：
+
+- `package.json`
+- `package-lock.json`
+- `SITE_CONFIG.version` in `js/config.js`
+- `VERSION.txt`
+- `CHANGELOG.md`
+
+版本语义：
+
+- Patch：修复、源调整、文档和部署维护。
+- Minor：用户可见功能新增。
+- Major：破坏性配置、部署或数据结构变更。
+
+## 维护路线
+
+短期工作见 [ROADMAP.md](ROADMAP.md)。当前阶段：
+
+1. 已完成公开维护基础：README、CHANGELOG、ROADMAP、模板和 CI。
+2. 已完成源健康检查：检测搜索、详情、m3u8 可用性。
+3. 已完成播放错误体验：区分源失效、代理失败、浏览器不支持等。
+4. 已完成首次使用和诊断页：帮助自部署用户发现环境问题。
+5. 正在做 GitHub 仓库优先的低风险引流：上游归档只读时，通过仓库元数据、release、本仓库 Discussions 和 Issues 承接迁移用户；若上游线程可回复，只在相关 issue 中透明说明维护 fork。
+
+## 开发检查
 
 ```bash
-docker compose up -d
+npm test
+node --check js/config.js
+node --check js/api.js
+node --check js/config-manager.js
+node --check js/source-health.js
+node --check js/app.js
+node --check js/player-errors.js
+node --check js/player.js
+node --check js/diagnostics.js
+node --check js/pwa-register.js
+node --check service-worker.js
+git diff --check -- . ':(exclude)package-lock.json'
 ```
-访问 `http://localhost:8899` 即可使用。
 
-### 本地开发环境
+CI 会在 push 和 pull request 上运行测试、JS 语法检查和基础静态检查。
+公开维护时建议使用分支和 PR 合并流程，`main` 只作为通过 CI 后的生产部署分支。
 
-项目包含后端代理功能，需要支持服务器端功能的环境：
+可选浏览器 smoke 检查：
 
 ```bash
-# 首先，通过复制示例来设置 .env 文件（可选）
-cp .env.example .env
-
-# 安装依赖
-npm install
-
-# 启动开发服务器
-npm run dev
+npm run smoke:browser
 ```
 
-访问 `http://localhost:8080` 即可使用（端口可在.env文件中通过PORT变量修改）。
+## 贡献
 
-> ⚠️ 注意：使用简单静态服务器（如 `python -m http.server` 或 `npx http-server`）时，视频代理功能将不可用，视频无法正常播放。完整功能测试请使用 Node.js 开发服务器。
+请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)、[ROADMAP.md](ROADMAP.md) 和 [CHANGELOG.md](CHANGELOG.md)。提交 PR 前请确认：
 
-## 🔧 自定义配置
+- 不包含密钥、密码、令牌或私人源。
+- 不引入视频内容缓存或内容分发能力。
+- 用户可见变更已更新版本号和 changelog。
+- `npm test` 和 JS 语法检查通过。
 
-### 密码保护
+维护者做上游 issue 回复或发布说明时，请遵守 [docs/UPSTREAM_OUTREACH.md](docs/UPSTREAM_OUTREACH.md)：只回复直接相关问题，不批量刷屏，不公开部署地址。
 
-要为您的 LibreTV 实例添加密码保护，可以在部署平台上设置环境变量：
+## 许可证
 
-**环境变量名**: `PASSWORD` 
-**值**: 您想设置的密码
-
-**环境变量名**: `ADMINPASSWORD` 
-**值**: 您想设置的密码
-
-各平台设置方法：
-
-- **Cloudflare Pages**: Dashboard > 您的项目 > 设置 > 环境变量
-- **Vercel**: Dashboard > 您的项目 > Settings > Environment Variables
-- **Netlify**: Dashboard > 您的项目 > Site settings > Build & deploy > Environment
-- **Docker**: 修改 `docker run` 中 `your_password` 为你的密码
-- **Docker Compose**: 修改 `docker-compose.yml` 中的 `your_password` 为你的密码
-- **本地开发**: SET PASSWORD=your_password
-
-### API兼容性
-
-LibreTV 支持标准的苹果 CMS V10 API 格式。添加自定义 API 时需遵循以下格式：
-- 搜索接口: `https://example.com/api.php/provide/vod/?ac=videolist&wd=关键词`
-- 详情接口: `https://example.com/api.php/provide/vod/?ac=detail&ids=视频ID`
-
-**添加 CMS 源**:
-1. 在设置面板中选择"自定义接口"
-2. 接口地址: `https://example.com/api.php/provide/vod`
-
-## ⌨️ 键盘快捷键
-
-播放器支持以下键盘快捷键：
-
-- **空格键**: 播放/暂停
-- **左右箭头**: 快退/快进
-- **上下箭头**: 音量增加/减小
-- **M 键**: 静音/取消静音
-- **F 键**: 全屏/退出全屏
-- **Esc 键**: 退出全屏
-
-## 🛠️ 技术栈
-
-- HTML5 + CSS3 + JavaScript (ES6+)
-- Tailwind CSS
-- HLS.js 用于 HLS 流处理
-- DPlayer 视频播放器核心
-- Cloudflare/Vercel/Netlify Serverless Functions
-- 服务端 HLS 代理和处理技术
-- localStorage 本地存储
-
-## ⚠️ 免责声明
-
-LibreTV 仅作为视频搜索工具，不存储、上传或分发任何视频内容。所有视频均来自第三方 API 接口提供的搜索结果。如有侵权内容，请联系相应的内容提供方。
-
-本项目开发者不对使用本项目产生的任何后果负责。使用本项目时，您必须遵守当地的法律法规。
-
-## 🎉 贡献者福利
-
-活跃贡献者可以在 [Issue #268](https://github.com/LibreSpark/LibreTV/issues/268) 中留言，申请免费上车 1Password Team，享受团队协作工具的便利！
-
-## 💝 支持项目
-
-如果您想支持本项目，可以考虑进行捐款：
-
-[![捐赠](https://img.shields.io/badge/爱心捐赠-无国界医生-1a85ff?style=for-the-badge&logo=medical-cross)](https://www.msf.hk/zh-hant/donate/general?type=one-off)
+本项目继承 Apache-2.0 许可证。贡献代码即表示同意按 Apache-2.0 分发。

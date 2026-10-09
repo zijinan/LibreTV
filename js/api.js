@@ -1,3 +1,45 @@
+function isDirectPlayableUrl(url) {
+    return /^https?:\/\/.+\.(m3u8|mp4|webm|mov|m4v|ts)(\?.*)?$/i.test(String(url || '').trim());
+}
+
+function extractUrlsFromPlaySource(playSource) {
+    return String(playSource || '')
+        .split('#')
+        .map(episode => {
+            const separatorIndex = episode.indexOf('$');
+            const rawUrl = separatorIndex >= 0 ? episode.slice(separatorIndex + 1) : episode;
+            return rawUrl.trim();
+        })
+        .filter(url => /^https?:\/\//i.test(url));
+}
+
+function extractPlayableEpisodes(videoDetail) {
+    if (!videoDetail) return [];
+
+    const playSources = String(videoDetail.vod_play_url || '').split('$$$');
+    const playSourceNames = String(videoDetail.vod_play_from || '').split('$$$');
+    const sourceGroups = playSources.map((source, index) => {
+        const urls = extractUrlsFromPlaySource(source);
+        const playableUrls = urls.filter(isDirectPlayableUrl);
+        const sourceName = playSourceNames[index] || '';
+        return { sourceName, urls, playableUrls };
+    });
+
+    const m3u8Source = sourceGroups.find(group =>
+        /m3u8|hls/i.test(group.sourceName) && group.playableUrls.length > 0
+    );
+    if (m3u8Source) return m3u8Source.playableUrls;
+
+    const directSource = sourceGroups.find(group => group.playableUrls.length > 0);
+    if (directSource) return directSource.playableUrls;
+
+    const fallbackSource = sourceGroups.find(group => group.urls.length > 0);
+    if (fallbackSource) return fallbackSource.urls;
+
+    const contentMatches = String(videoDetail.vod_content || '').match(M3U8_PATTERN) || [];
+    return contentMatches.map(link => link.replace(/^\$/, ''));
+}
+
 // 改进的API请求处理函数
 async function handleApiRequest(url) {
     const customApi = url.searchParams.get('customApi') || '';
@@ -29,7 +71,12 @@ async function handleApiRequest(url) {
             const timeoutId = setTimeout(() => controller.abort(), 10000);
             
             try {
-                const response = await fetch(PROXY_URL + encodeURIComponent(apiUrl), {
+                // 添加鉴权参数到代理URL
+                const proxiedUrl = await window.ProxyAuth?.addAuthToProxyUrl ? 
+                    await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(apiUrl)) :
+                    PROXY_URL + encodeURIComponent(apiUrl);
+                    
+                const response = await fetch(proxiedUrl, {
                     headers: API_CONFIG.search.headers,
                     signal: controller.signal
                 });
@@ -113,7 +160,12 @@ async function handleApiRequest(url) {
             const timeoutId = setTimeout(() => controller.abort(), 10000);
             
             try {
-                const response = await fetch(PROXY_URL + encodeURIComponent(detailUrl), {
+                // 添加鉴权参数到代理URL
+                const proxiedUrl = await window.ProxyAuth?.addAuthToProxyUrl ? 
+                    await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(detailUrl)) :
+                    PROXY_URL + encodeURIComponent(detailUrl);
+                    
+                const response = await fetch(proxiedUrl, {
                     headers: API_CONFIG.detail.headers,
                     signal: controller.signal
                 });
@@ -135,32 +187,7 @@ async function handleApiRequest(url) {
                 // 获取第一个匹配的视频详情
                 const videoDetail = data.list[0];
                 
-                // 提取播放地址
-                let episodes = [];
-                
-                if (videoDetail.vod_play_url) {
-                    // 分割不同播放源
-                    const playSources = videoDetail.vod_play_url.split('$$$');
-                    
-                    // 提取第一个播放源的集数（通常为主要源）
-                    if (playSources.length > 0) {
-                        const mainSource = playSources[0];
-                        const episodeList = mainSource.split('#');
-                        
-                        // 从每个集数中提取URL
-                        episodes = episodeList.map(ep => {
-                            const parts = ep.split('$');
-                            // 返回URL部分(通常是第二部分，如果有的话)
-                            return parts.length > 1 ? parts[1] : '';
-                        }).filter(url => url && (url.startsWith('http://') || url.startsWith('https://')));
-                    }
-                }
-                
-                // 如果没有找到播放地址，尝试使用正则表达式查找m3u8链接
-                if (episodes.length === 0 && videoDetail.vod_content) {
-                    const matches = videoDetail.vod_content.match(M3U8_PATTERN) || [];
-                    episodes = matches.map(link => link.replace(/^\$/, ''));
-                }
+                const episodes = extractPlayableEpisodes(videoDetail);
                 
                 return JSON.stringify({
                     code: 200,
@@ -209,8 +236,13 @@ async function handleCustomApiSpecialDetail(id, customApi) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
         
+        // 添加鉴权参数到代理URL
+        const proxiedUrl = await window.ProxyAuth?.addAuthToProxyUrl ? 
+            await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(detailUrl)) :
+            PROXY_URL + encodeURIComponent(detailUrl);
+            
         // 获取详情页HTML
-        const response = await fetch(PROXY_URL + encodeURIComponent(detailUrl), {
+        const response = await fetch(proxiedUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             },
@@ -271,8 +303,13 @@ async function handleSpecialSourceDetail(id, sourceCode) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
         
+        // 添加鉴权参数到代理URL
+        const proxiedUrl = await window.ProxyAuth?.addAuthToProxyUrl ? 
+            await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(detailUrl)) :
+            PROXY_URL + encodeURIComponent(detailUrl);
+            
         // 获取详情页HTML
-        const response = await fetch(PROXY_URL + encodeURIComponent(detailUrl), {
+        const response = await fetch(proxiedUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             },
@@ -356,7 +393,12 @@ async function handleAggregatedSearch(searchQuery) {
                 setTimeout(() => reject(new Error(`${source}源搜索超时`)), 8000)
             );
             
-            const fetchPromise = fetch(PROXY_URL + encodeURIComponent(apiUrl), {
+            // 添加鉴权参数到代理URL
+            const proxiedUrl = await window.ProxyAuth?.addAuthToProxyUrl ? 
+                await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(apiUrl)) :
+                PROXY_URL + encodeURIComponent(apiUrl);
+            
+            const fetchPromise = fetch(proxiedUrl, {
                 headers: API_CONFIG.search.headers
             });
             
@@ -465,7 +507,12 @@ async function handleMultipleCustomSearch(searchQuery, customApiUrls) {
                 setTimeout(() => reject(new Error(`自定义API ${index+1} 搜索超时`)), 8000)
             );
             
-            const fetchPromise = fetch(PROXY_URL + encodeURIComponent(fullUrl), {
+            // 添加鉴权参数到代理URL
+            const proxiedUrl = await window.ProxyAuth?.addAuthToProxyUrl ? 
+                await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(fullUrl)) :
+                PROXY_URL + encodeURIComponent(fullUrl);
+            
+            const fetchPromise = fetch(proxiedUrl, {
                 headers: API_CONFIG.search.headers
             });
             
