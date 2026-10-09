@@ -1,5 +1,11 @@
 blank_issues_enabled: false
 contact_links:
-  - name: How To Ask Questions The Smart Way / 提问的智慧
-    about: Read it before start a new issue
-    url: http://www.catb.org/~esr/faqs/smart-questions.html
+  - name: Upstream migration discussion
+    about: Ask migration and setup questions before opening a reproducible bug.
+    url: https://github.com/wxst/LibreTV/discussions/9
+  - name: Roadmap
+    about: Check current priorities before requesting a feature.
+    url: https://github.com/wxst/LibreTV/blob/main/ROADMAP.md
+  - name: Security and deployment notes
+    about: Review password and self-hosting requirements.
+    url: https://github.com/wxst/LibreTV/blob/main/README.md

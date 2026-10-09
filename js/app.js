@@ -1,5 +1,5 @@
 // 全局变量
-let selectedAPIs = JSON.parse(localStorage.getItem('selectedAPIs') || '["tyyszy","dyttzy", "bfzy", "ruyi"]'); // 默认选中资源
+let selectedAPIs = JSON.parse(localStorage.getItem('selectedAPIs') || JSON.stringify(DEFAULT_SELECTED_APIS)); // 默认选中资源
 let customAPIs = JSON.parse(localStorage.getItem('customAPIs') || '[]'); // 存储自定义API列表
 
 // 添加当前播放的集数索引
@@ -11,8 +11,169 @@ let currentVideoTitle = '';
 // 全局变量用于倒序状态
 let episodesReversed = false;
 
+const YELLOW_CONTENT_KEYWORDS = [
+    '伦理片', '福利', '里番动漫', '门事件', '萝莉少女', '制服诱惑', '国产传媒',
+    'cosplay', '黑丝诱惑', '无码', '日本无码', '有码', '日本有码', 'swag',
+    '网红主播', '美女主播', '国产自拍', '色情片', '同性片', '福利视频', '福利片',
+    '成人', '情色', '女优', '人妻', '巨乳', '私拍', '大尺度', '麻豆', '抖阴',
+    '热舞', '裸聊', '自慰', '做爱', '性交', '口交', '约炮', '无码流出',
+    '番号', '爆乳', '翘臀', '嫩模', '嫩妹', '美乳', '白丝', '丝袜', '写真'
+];
+
+const SEARCH_TITLE_FIELDS = [
+    'vod_name',
+    'vod_sub',
+    'vod_en',
+    'title',
+    'name'
+];
+
+function isYellowContentFilterEnabled() {
+    return localStorage.getItem('yellowFilterEnabled') === 'true';
+}
+
+function isAdultSourceId(apiId) {
+    if (!apiId) return false;
+    if (apiId.startsWith('custom_')) {
+        const customApi = getCustomApiInfo(apiId.replace('custom_', ''));
+        return Boolean(customApi?.isAdult);
+    }
+    return Boolean(API_SITES[apiId]?.adult);
+}
+
+function getSearchableApiIds(apiIds = selectedAPIs) {
+    const ids = Array.from(apiIds || []);
+    if (!isYellowContentFilterEnabled()) return ids;
+    return ids.filter(apiId => !isAdultSourceId(apiId));
+}
+
+function getSelectedAdultApiIds(apiIds = selectedAPIs) {
+    return Array.from(apiIds || []).filter(apiId => isAdultSourceId(apiId));
+}
+
+function shouldShowAdultRecommendTag() {
+    return !isYellowContentFilterEnabled() && getSelectedAdultApiIds().length > 0;
+}
+
+function normalizeFilterText(value) {
+    return String(value || '').toLowerCase();
+}
+
+function normalizeSearchText(value) {
+    return String(value || '').toLowerCase().replace(/\s+/g, '');
+}
+
+function getSearchTitleTexts(item) {
+    return SEARCH_TITLE_FIELDS
+        .map(field => normalizeSearchText(item?.[field]))
+        .filter(Boolean);
+}
+
+function doesResultMatchQuery(item, query) {
+    const compactQuery = normalizeSearchText(query);
+    if (!compactQuery) return true;
+
+    const titleTexts = getSearchTitleTexts(item);
+    if (titleTexts.some(text => text.includes(compactQuery))) {
+        return true;
+    }
+
+    const queryTerms = String(query || '')
+        .toLowerCase()
+        .split(/\s+/)
+        .map(normalizeSearchText)
+        .filter(Boolean);
+
+    return queryTerms.length > 1 && queryTerms.every(term =>
+        titleTexts.some(text => text.includes(term))
+    );
+}
+
+function filterResultsByQuery(results, query) {
+    const list = Array.isArray(results) ? results : [];
+    return list.filter(item => doesResultMatchQuery(item, query));
+}
+
+function matchesYellowContent(item) {
+    if (isAdultSourceId(item?.source_code)) return true;
+
+    const haystack = [
+        item?.vod_name,
+        item?.vod_sub,
+        item?.vod_en,
+        item?.title,
+        item?.name,
+        item?.type_name,
+        item?.vod_class,
+        item?.vod_remarks,
+        item?.vod_content,
+        item?.desc,
+        item?.description,
+        item?.source_name
+    ].map(normalizeFilterText).join(' ');
+
+    return YELLOW_CONTENT_KEYWORDS.some(keyword => haystack.includes(keyword.toLowerCase()));
+}
+
+function filterYellowContentResults(results) {
+    const list = Array.isArray(results) ? results : [];
+    if (!isYellowContentFilterEnabled()) return list;
+    return list.filter(item => !matchesYellowContent(item));
+}
+
+function getResultTypeLabel(item) {
+    if (matchesYellowContent(item)) return '成人视频';
+    return String(item?.type_name || '').trim();
+}
+
+function getResultTypeLabelClass(item) {
+    if (matchesYellowContent(item)) {
+        return 'bg-opacity-20 bg-pink-500 text-pink-300';
+    }
+    return 'bg-opacity-20 bg-blue-500 text-blue-300';
+}
+
+function getAvailableDefaultApiIds() {
+    return DEFAULT_SELECTED_APIS.filter(apiId => API_SITES[apiId]);
+}
+
+function initializeDefaultSettings() {
+    const defaultApiIds = getAvailableDefaultApiIds();
+
+    if (!localStorage.getItem('hasInitializedDefaults')) {
+        selectedAPIs = [...defaultApiIds];
+        localStorage.setItem('selectedAPIs', JSON.stringify(selectedAPIs));
+
+        localStorage.setItem('yellowFilterEnabled', 'true');
+        localStorage.setItem(PLAYER_CONFIG.adFilteringStorage, 'true');
+        localStorage.setItem('doubanEnabled', 'true');
+        localStorage.setItem('hasInitializedDefaults', 'true');
+        localStorage.setItem(DEFAULT_API_MIGRATION_KEY, DEFAULT_API_MIGRATION_VERSION);
+        return;
+    }
+
+    if (localStorage.getItem(DEFAULT_API_MIGRATION_KEY) === DEFAULT_API_MIGRATION_VERSION) {
+        return;
+    }
+
+    let changed = false;
+    defaultApiIds.forEach(apiId => {
+        if (!selectedAPIs.includes(apiId)) {
+            selectedAPIs.push(apiId);
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        localStorage.setItem('selectedAPIs', JSON.stringify(selectedAPIs));
+    }
+    localStorage.setItem(DEFAULT_API_MIGRATION_KEY, DEFAULT_API_MIGRATION_VERSION);
+}
+
 // 页面初始化
 document.addEventListener('DOMContentLoaded', function () {
+    initializeDefaultSettings();
+
     // 初始化API复选框
     initAPICheckboxes();
 
@@ -24,23 +185,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 渲染搜索历史
     renderSearchHistory();
-
-    // 设置默认API选择（如果是第一次加载）
-    if (!localStorage.getItem('hasInitializedDefaults')) {
-        // 默认选中资源
-        selectedAPIs = ["tyyszy", "bfzy", "dyttzy", "ruyi"];
-        localStorage.setItem('selectedAPIs', JSON.stringify(selectedAPIs));
-
-        // 默认选中过滤开关
-        localStorage.setItem('yellowFilterEnabled', 'true');
-        localStorage.setItem(PLAYER_CONFIG.adFilteringStorage, 'true');
-
-        // 默认启用豆瓣功能
-        localStorage.setItem('doubanEnabled', 'true');
-
-        // 标记已初始化默认值
-        localStorage.setItem('hasInitializedDefaults', 'true');
-    }
 
     // 设置黄色内容过滤器开关初始状态
     const yellowFilterToggle = document.getElementById('yellowFilterToggle');
@@ -166,42 +310,28 @@ function checkAdultAPIsSelected() {
     const hasAdultSelected = adultBuiltinCheckboxes.length > 0 || customApiCheckboxes.length > 0;
 
     const yellowFilterToggle = document.getElementById('yellowFilterToggle');
+    if (!yellowFilterToggle) return;
     const yellowFilterContainer = yellowFilterToggle.closest('div').parentNode;
     const filterDescription = yellowFilterContainer.querySelector('p.filter-description');
+    const existingTooltip = yellowFilterContainer.querySelector('.filter-tooltip');
+    if (existingTooltip) {
+        existingTooltip.remove();
+    }
 
-    // 如果选择了成人API，禁用黄色内容过滤器
-    if (hasAdultSelected) {
-        yellowFilterToggle.checked = false;
-        yellowFilterToggle.disabled = true;
-        localStorage.setItem('yellowFilterEnabled', 'false');
+    yellowFilterToggle.disabled = false;
+    yellowFilterContainer.classList.remove('filter-disabled');
 
-        // 添加禁用样式
-        yellowFilterContainer.classList.add('filter-disabled');
-
-        // 修改描述文字
+    if (hasAdultSelected && yellowFilterToggle.checked) {
         if (filterDescription) {
-            filterDescription.innerHTML = '<strong class="text-pink-300">选中黄色资源站时无法启用此过滤</strong>';
+            filterDescription.innerHTML = '<strong class="text-pink-300">已启用过滤，搜索时会跳过黄色资源站</strong>';
         }
-
-        // 移除提示信息（如果存在）
-        const existingTooltip = yellowFilterContainer.querySelector('.filter-tooltip');
-        if (existingTooltip) {
-            existingTooltip.remove();
+    } else if (hasAdultSelected) {
+        if (filterDescription) {
+            filterDescription.innerHTML = '<strong class="text-pink-300">关闭过滤后会搜索已选黄色资源站</strong>';
         }
     } else {
-        // 启用黄色内容过滤器
-        yellowFilterToggle.disabled = false;
-        yellowFilterContainer.classList.remove('filter-disabled');
-
-        // 恢复原来的描述文字
         if (filterDescription) {
             filterDescription.innerHTML = '过滤"伦理片"等黄色内容';
-        }
-
-        // 移除提示信息
-        const existingTooltip = yellowFilterContainer.querySelector('.filter-tooltip');
-        if (existingTooltip) {
-            existingTooltip.remove();
         }
     }
 }
@@ -351,6 +481,10 @@ function updateSelectedAPIs() {
 
     // 更新显示选中的API数量
     updateSelectedApiCount();
+
+    if (typeof window.refreshDoubanAdultTagState === 'function') {
+        window.refreshDoubanAdultTagState();
+    }
 }
 
 // 更新选中的API数量显示
@@ -484,21 +618,9 @@ function toggleSettings(e) {
     const settingsPanel = document.getElementById('settingsPanel');
     if (!settingsPanel) return;
 
-    // 检查是否有管理员密码
-    const hasAdminPassword = window.__ENV__?.ADMINPASSWORD && 
-                           window.__ENV__.ADMINPASSWORD.length === 64 && 
-                           !/^0+$/.test(window.__ENV__.ADMINPASSWORD);
-
     if (settingsPanel.classList.contains('show')) {
         settingsPanel.classList.remove('show');
     } else {
-        // 只有设置了管理员密码且未验证时才拦截
-        if (hasAdminPassword && !isAdminVerified()) {
-            e.preventDefault();
-            e.stopPropagation();
-            showAdminPasswordModal();
-            return;
-        }
         settingsPanel.classList.add('show');
     }
 
@@ -557,6 +679,11 @@ function setupEventListeners() {
             } else {
                 // 添加成人API列表
                 addAdultAPI();
+            }
+
+            checkAdultAPIsSelected();
+            if (typeof window.refreshDoubanAdultTagState === 'function') {
+                window.refreshDoubanAdultTagState();
             }
         });
     }
@@ -617,12 +744,22 @@ function getCustomApiInfo(customApiIndex) {
 
 // 搜索功能 - 修改为支持多选API和多页结果
 async function search() {
-    // 密码保护校验
-    if (window.isPasswordProtected && window.isPasswordVerified) {
-        if (window.isPasswordProtected() && !window.isPasswordVerified()) {
-            showPasswordModal && showPasswordModal();
-            return;
+    // 强化的密码保护校验 - 防止绕过
+    try {
+        if (window.ensurePasswordProtection) {
+            window.ensurePasswordProtection();
+        } else {
+            // 兼容性检查
+            if (window.isPasswordProtected && window.isPasswordVerified) {
+                if (window.isPasswordProtected() && !window.isPasswordVerified()) {
+                    showPasswordModal && showPasswordModal();
+                    return;
+                }
+            }
         }
+    } catch (error) {
+        console.warn('Password protection check failed:', error.message);
+        return;
     }
     const query = document.getElementById('searchInput').value.trim();
 
@@ -636,6 +773,12 @@ async function search() {
         return;
     }
 
+    const searchableApiIds = getSearchableApiIds(selectedAPIs);
+    if (searchableApiIds.length === 0) {
+        showToast('黄色内容过滤已开启，当前选中的黄色资源站已被跳过', 'warning');
+        return;
+    }
+
     showLoading();
 
     try {
@@ -644,7 +787,7 @@ async function search() {
 
         // 从所有选中的API源搜索
         let allResults = [];
-        const searchPromises = selectedAPIs.map(apiId => 
+        const searchPromises = searchableApiIds.map(apiId =>
             searchByAPIAndKeyWord(apiId, query)
         );
 
@@ -657,6 +800,8 @@ async function search() {
                 allResults = allResults.concat(results);
             }
         });
+
+        allResults = filterYellowContentResults(allResults);
 
         // 对搜索结果进行排序：按名称优先，名称相同时按接口源排序
         allResults.sort((a, b) => {
@@ -720,16 +865,6 @@ async function search() {
             // 如果更新URL失败，继续执行搜索
         }
 
-        // 处理搜索结果过滤：如果启用了黄色内容过滤，则过滤掉分类含有敏感内容的项目
-        const yellowFilterEnabled = localStorage.getItem('yellowFilterEnabled') === 'true';
-        if (yellowFilterEnabled) {
-            const banned = ['伦理片', '福利', '里番动漫', '门事件', '萝莉少女', '制服诱惑', '国产传媒', 'cosplay', '黑丝诱惑', '无码', '日本无码', '有码', '日本有码', 'SWAG', '网红主播', '色情片', '同性片', '福利视频', '福利片'];
-            allResults = allResults.filter(item => {
-                const typeName = item.type_name || '';
-                return !banned.some(keyword => typeName.includes(keyword));
-            });
-        }
-
         // 添加XSS保护，使用textContent和属性转义
         const safeResults = allResults.map(item => {
             const safeId = item.vod_id ? item.vod_id.toString().replace(/[^\w-]/g, '') : '';
@@ -737,16 +872,22 @@ async function search() {
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;');
+            const resultTypeLabel = getResultTypeLabel(item);
+            const safeTypeLabel = escapeHtmlAttr(resultTypeLabel);
+            const resultTypeClass = getResultTypeLabelClass(item);
             const sourceInfo = item.source_name ?
-                `<span class="bg-[#222] text-xs px-1.5 py-0.5 rounded-full">${item.source_name}</span>` : '';
+                `<span class="bg-[#222] text-xs px-1.5 py-0.5 rounded-full">${escapeHtmlAttr(item.source_name)}</span>` : '';
             const sourceCode = item.source_code || '';
+            const apiBaseUrl = item.api_url || (sourceCode && API_SITES[sourceCode]?.api) || '';
+            const coverUrl = normalizeImageUrl(item.vod_pic, apiBaseUrl);
+            const safeCoverUrl = escapeHtmlAttr(coverUrl);
 
             // 添加API URL属性，用于详情获取
             const apiUrlAttr = item.api_url ?
                 `data-api-url="${item.api_url.replace(/"/g, '&quot;')}"` : '';
 
             // 修改为水平卡片布局，图片在左侧，文本在右侧，并优化样式
-            const hasCover = item.vod_pic && item.vod_pic.startsWith('http');
+            const hasCover = Boolean(coverUrl);
 
             return `
                 <div class="card-hover bg-[#111] rounded-lg overflow-hidden cursor-pointer transition-all hover:scale-[1.02] h-full shadow-sm hover:shadow-md" 
@@ -754,10 +895,10 @@ async function search() {
                     <div class="flex h-full">
                         ${hasCover ? `
                         <div class="relative flex-shrink-0 search-card-img-container">
-                            <img src="${item.vod_pic}" alt="${safeName}" 
+                            <img src="${safeCoverUrl}" data-original-src="${safeCoverUrl}" alt="${safeName}"
                                  class="h-full w-full object-cover transition-transform hover:scale-110" 
-                                 onerror="this.onerror=null; this.src='https://via.placeholder.com/300x450?text=无封面'; this.classList.add('object-contain');" 
-                                 loading="lazy">
+                                 onerror="window.setImageProxyFallback(this, this.dataset.originalSrc, '无封面')"
+                                 loading="lazy" referrerpolicy="no-referrer">
                             <div class="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent"></div>
                         </div>` : ''}
                         
@@ -766,9 +907,9 @@ async function search() {
                                 <h3 class="font-semibold mb-2 break-words line-clamp-2 ${hasCover ? '' : 'text-center'}" title="${safeName}">${safeName}</h3>
                                 
                                 <div class="flex flex-wrap ${hasCover ? '' : 'justify-center'} gap-1 mb-2">
-                                    ${(item.type_name || '').toString().replace(/</g, '&lt;') ?
-                    `<span class="text-xs py-0.5 px-1.5 rounded bg-opacity-20 bg-blue-500 text-blue-300">
-                                          ${(item.type_name || '').toString().replace(/</g, '&lt;')}
+                                    ${safeTypeLabel ?
+                    `<span class="text-xs py-0.5 px-1.5 rounded ${resultTypeClass}">
+                                          ${safeTypeLabel}
                                       </span>` : ''}
                                     ${(item.vod_year || '') ?
                     `<span class="text-xs py-0.5 px-1.5 rounded bg-opacity-20 bg-purple-500 text-purple-300">
@@ -1219,21 +1360,7 @@ async function importConfigFromUrl() {
             }
 
             const config = await response.json();
-            if (config.name !== 'LibreTV-Settings') throw '配置文件格式不正确';
-
-            // 验证哈希
-            const dataHash = await sha256(JSON.stringify(config.data));
-            if (dataHash !== config.hash) throw '配置文件哈希值不匹配';
-
-            // 导入配置
-            for (let item in config.data) {
-                localStorage.setItem(item, config.data[item]);
-            }
-
-            showToast('配置文件导入成功，3 秒后自动刷新本页面。', 'success');
-            setTimeout(() => {
-                window.location.reload();
-            }, 3000);
+            await importConfigPayload(config);
         } catch (error) {
             const message = typeof error === 'string' ? error : '导入配置失败';
             showToast(`从URL导入配置出错 (${message})`, 'error');
@@ -1249,6 +1376,18 @@ async function importConfigFromUrl() {
             document.body.removeChild(modal);
         }
     });
+}
+
+async function importConfigPayload(config) {
+    const result = await validateAndMigrateConfig(config);
+    applyConfigData(result.data);
+    const migrationText = result.migrationMessages.length > 0
+        ? `（${result.migrationMessages.join('；')}）`
+        : '';
+    showToast(`配置文件导入成功${migrationText}，3 秒后自动刷新本页面。`, 'success');
+    setTimeout(() => {
+        window.location.reload();
+    }, 3000);
 }
 
 // 配置文件导入功能
@@ -1269,23 +1408,8 @@ async function importConfig() {
                 reader.readAsText(file);
             });
 
-            // 解析并验证配置
             const config = JSON.parse(content);
-            if (config.name !== 'LibreTV-Settings') throw '配置文件格式不正确';
-
-            // 验证哈希
-            const dataHash = await sha256(JSON.stringify(config.data));
-            if (dataHash !== config.hash) throw '配置文件哈希值不匹配';
-
-            // 导入配置
-            for (let item in config.data) {
-                localStorage.setItem(item, config.data[item]);
-            }
-
-            showToast('配置文件导入成功，3 秒后自动刷新本页面。', 'success');
-            setTimeout(() => {
-                window.location.reload();
-            }, 3000);
+            await importConfigPayload(config);
         } catch (error) {
             const message = typeof error === 'string' ? error : '配置文件格式错误';
             showToast(`配置文件读取出错 (${message})`, 'error');
@@ -1295,47 +1419,8 @@ async function importConfig() {
 
 // 配置文件导出功能
 async function exportConfig() {
-    // 存储配置数据
-    const config = {};
-    const items = {};
-
-    const settingsToExport = [
-        'selectedAPIs',
-        'customAPIs',
-        'yellowFilterEnabled',
-        'adFilteringEnabled',
-        'doubanEnabled',
-        'hasInitializedDefaults'
-    ];
-
-    // 导出设置项
-    settingsToExport.forEach(key => {
-        const value = localStorage.getItem(key);
-        if (value !== null) {
-            items[key] = value;
-        }
-    });
-
-    // 导出历史记录
-    const viewingHistory = localStorage.getItem('viewingHistory');
-    if (viewingHistory) {
-        items['viewingHistory'] = viewingHistory;
-    }
-
-    const searchHistory = localStorage.getItem(SEARCH_HISTORY_KEY);
-    if (searchHistory) {
-        items[SEARCH_HISTORY_KEY] = searchHistory;
-    }
-
-    const times = Date.now().toString();
-    config['name'] = 'LibreTV-Settings';  // 配置文件名，用于校验
-    config['time'] = times;               // 配置文件生成时间
-    config['cfgVer'] = '1.0.0';           // 配置文件版本
-    config['data'] = items;               // 配置文件数据
-    config['hash'] = await sha256(JSON.stringify(config['data']));  // 计算数据的哈希值，用于校验
-
-    // 将配置数据保存为 JSON 文件
-    saveStringAsFile(JSON.stringify(config), 'LibreTV-Settings_' + times + '.json');
+    const config = await buildConfigExport();
+    saveStringAsFile(JSON.stringify(config), 'LibreTV-Settings_' + config.time + '.json');
 }
 
 // 将字符串保存为文件
@@ -1354,5 +1439,14 @@ function saveStringAsFile(content, fileName) {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
 }
+
+window.getSearchableApiIds = getSearchableApiIds;
+window.getSelectedAdultApiIds = getSelectedAdultApiIds;
+window.shouldShowAdultRecommendTag = shouldShowAdultRecommendTag;
+window.doesResultMatchQuery = doesResultMatchQuery;
+window.filterResultsByQuery = filterResultsByQuery;
+window.filterYellowContentResults = filterYellowContentResults;
+window.matchesYellowContent = matchesYellowContent;
+window.getResultTypeLabel = getResultTypeLabel;
 
 // 移除Node.js的require语句，因为这是在浏览器环境中运行的

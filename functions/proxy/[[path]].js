@@ -7,6 +7,7 @@
 // FILTER_DISCONTINUITY (不再需要，设为 false 或移除)
 // USER_AGENTS_JSON (例如 ["UA1", "UA2"]) - JSON 字符串数组
 // DEBUG (例如 false 或 true)
+// PASSWORD (例如 "your_password") - 鉴权密码
 // --- 配置结束 ---
 
 // --- 常量 (之前在 config.js 中，现在移到这里，因为它们与代理逻辑相关) ---
@@ -26,6 +27,23 @@ const MEDIA_CONTENT_TYPES = ['video/', 'audio/', 'image/'];
 export async function onRequest(context) {
     const { request, env, next, waitUntil } = context; // next 和 waitUntil 可能需要
     const url = new URL(request.url);
+
+    // 验证鉴权（主函数调用）
+    const isValidAuth = await validateAuth(request, env);
+    if (!isValidAuth) {
+        return new Response(JSON.stringify({
+            success: false,
+            error: '代理访问未授权：请检查密码配置或鉴权参数'
+        }), { 
+            status: 401,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
+                'Access-Control-Allow-Headers': '*',
+                'Content-Type': 'application/json'
+            }
+        });
+    }
 
     // --- 从环境变量读取配置 ---
     const DEBUG_ENABLED = (env.DEBUG === 'true');
@@ -53,6 +71,76 @@ export async function onRequest(context) {
 
 
     // --- 辅助函数 ---
+
+    // 验证代理请求的鉴权
+    async function validateAuth(request, env) {
+        const url = new URL(request.url);
+        const authHash = url.searchParams.get('auth');
+        const timestamp = url.searchParams.get('t');
+        
+        // 获取服务器端密码或显式密码哈希
+        const serverPassword = env.PASSWORD || '';
+        const configuredPasswordHash = (env.PASSWORD_HASH || '').trim().toLowerCase();
+        const acceptedHashes = new Set();
+
+        if (/^[a-f0-9]{64}$/.test(configuredPasswordHash)) {
+            acceptedHashes.add(configuredPasswordHash);
+        }
+
+        if (!serverPassword && acceptedHashes.size === 0) {
+            console.error('服务器未设置 PASSWORD 环境变量，代理访问被拒绝');
+            return false;
+        }
+        
+        // 使用 SHA-256 哈希算法（与其他平台保持一致）
+        // 在 Cloudflare Workers 中使用 crypto.subtle
+        try {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(serverPassword);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const serverPasswordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+            if (serverPassword) {
+                acceptedHashes.add(serverPasswordHash);
+                if (/^[a-f0-9]{64}$/i.test(serverPassword)) {
+                    acceptedHashes.add(serverPassword.toLowerCase());
+                }
+            }
+            
+            if (!authHash || !acceptedHashes.has(authHash.toLowerCase())) {
+                console.warn(`代理请求鉴权失败：密码哈希不匹配 authLength=${authHash ? authHash.length : 0} acceptedCount=${acceptedHashes.size} hasPassword=${Boolean(serverPassword)} hasPasswordHash=${acceptedHashes.has(configuredPasswordHash)}`);
+                return false;
+            }
+        } catch (error) {
+            console.error('计算密码哈希失败:', error);
+            return false;
+        }
+        
+        // 验证时间戳（10分钟有效期）
+        if (timestamp) {
+            const now = Date.now();
+            const maxAge = 10 * 60 * 1000; // 10分钟
+            if (now - parseInt(timestamp) > maxAge) {
+                console.warn('代理请求鉴权失败：时间戳过期');
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
+    // 验证鉴权（主函数调用）
+    if (!validateAuth(request, env)) {
+        return new Response('Unauthorized', { 
+            status: 401,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
+                'Access-Control-Allow-Headers': '*'
+            }
+        });
+    }
 
     // 输出调试日志 (需要设置 DEBUG: true 环境变量)
     function logDebug(message) {
@@ -123,6 +211,14 @@ export async function onRequest(context) {
         return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
     }
 
+    function getTargetReferer(targetUrl) {
+        const target = new URL(targetUrl);
+        if (target.hostname.endsWith('doubanio.com')) {
+            return 'https://movie.douban.com/';
+        }
+        return target.origin + '/';
+    }
+
     // 获取 URL 的基础路径 (用于解析相对路径)
     function getBaseUrl(urlStr) {
         try {
@@ -179,8 +275,8 @@ export async function onRequest(context) {
             'Accept': '*/*',
             // 尝试传递一些原始请求的头信息
             'Accept-Language': request.headers.get('Accept-Language') || 'zh-CN,zh;q=0.9,en;q=0.8',
-            // 尝试设置 Referer 为目标网站的域名，或者传递原始 Referer
-            'Referer': request.headers.get('Referer') || new URL(targetUrl).origin
+            // 图片和视频热链经常校验 Referer，使用目标站点来源比透传本站来源更稳。
+            'Referer': getTargetReferer(targetUrl)
         });
 
         try {
@@ -195,11 +291,12 @@ export async function onRequest(context) {
                  throw new Error(`HTTP error ${response.status}: ${response.statusText}. URL: ${targetUrl}. Body: ${errorBody.substring(0, 150)}`);
             }
 
-            // 读取响应内容为文本
-            const content = await response.text();
             const contentType = response.headers.get('Content-Type') || '';
-            logDebug(`请求成功: ${targetUrl}, Content-Type: ${contentType}, 内容长度: ${content.length}`);
-            return { content, contentType, responseHeaders: response.headers }; // 同时返回原始响应头
+            const isBinary = isMediaFile(targetUrl, contentType) && !isM3u8Content('', contentType);
+            const content = isBinary ? await response.arrayBuffer() : await response.text();
+            const contentLength = isBinary ? content.byteLength : content.length;
+            logDebug(`请求成功: ${targetUrl}, Content-Type: ${contentType}, 内容长度: ${contentLength}`);
+            return { content, contentType, responseHeaders: response.headers, isBinary }; // 同时返回原始响应头
 
         } catch (error) {
              logDebug(`请求彻底失败: ${targetUrl}: ${error.message}`);
@@ -465,10 +562,10 @@ export async function onRequest(context) {
         }
 
         // --- 实际请求 ---
-        const { content, contentType, responseHeaders } = await fetchContentWithType(targetUrl);
+        const { content, contentType, responseHeaders, isBinary } = await fetchContentWithType(targetUrl);
 
         // --- 写入缓存 (KV) ---
-        if (kvNamespace) {
+        if (!isBinary && kvNamespace) {
              try {
                  const headersToCache = {};
                  responseHeaders.forEach((value, key) => { headersToCache[key.toLowerCase()] = value; });
@@ -483,7 +580,7 @@ export async function onRequest(context) {
         }
 
         // --- 处理响应 ---
-        if (isM3u8Content(content, contentType)) {
+        if (!isBinary && isM3u8Content(content, contentType)) {
             logDebug(`内容是 M3U8，开始处理: ${targetUrl}`);
             const processedM3u8 = await processM3u8Content(targetUrl, content, 0, env);
             return createM3u8Response(processedM3u8);
@@ -491,6 +588,8 @@ export async function onRequest(context) {
             logDebug(`内容不是 M3U8 (类型: ${contentType})，直接返回: ${targetUrl}`);
             const finalHeaders = new Headers(responseHeaders);
             finalHeaders.set('Cache-Control', `public, max-age=${CACHE_TTL}`);
+            finalHeaders.delete('Content-Encoding');
+            finalHeaders.delete('Content-Length');
             // 添加 CORS 头，确保非 M3U8 内容也能跨域访问（例如图片、字幕文件等）
             finalHeaders.set("Access-Control-Allow-Origin", "*");
             finalHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS");

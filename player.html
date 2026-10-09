@@ -4,11 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="same-origin">
+    <meta name="theme-color" content="#0f1622">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <title>LibreTV 播放器</title>
 
     <!-- Favicon -->
     <link rel="icon" href="image/logo.png">
-    <link rel="apple-touch-icon" href="image/logo-black.png">
+    <link rel="apple-touch-icon" href="image/icon-192.png">
     <link rel="manifest" href="manifest.json">
 
     <script src="libs/tailwindcss.min.js"></script>
@@ -75,7 +79,8 @@
                 <div class="error-container" id="error">
                     <div class="error-icon">⚠️</div>
                     <div id="error-message">视频加载失败</div>
-                    <div class="error-message-sub">请尝试其他视频源或稍后重试</div>
+                    <div id="error-message-sub" class="error-message-sub">请尝试其他视频源或稍后重试</div>
+                    <div id="error-actions" class="error-actions"></div>
                 </div>
             </div>
         </div>
@@ -227,11 +232,15 @@
     <script src="libs/artplayer.min.js" crossorigin="anonymous"></script>
 
     <script src="js/config.js"></script>
+    <script src="js/proxy-auth.js"></script>
+    <script src="js/customer_site.js"></script>
     <script src="js/password.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/api.js"></script>
     <script src="js/search.js"></script>
+    <script src="js/player-errors.js"></script>
     <script src="js/player.js"></script>
+    <script src="js/pwa-register.js"></script>
 
     <script>
         // 创建全局环境变量对象
@@ -240,7 +249,6 @@
         // 注入服务器端环境变量 (将由服务器端替换)
         // PASSWORD 变量将在这里被服务器端注入
         window.__ENV__.PASSWORD = "{{PASSWORD}}";
-        window.__ENV__.ADMINPASSWORD = "{{ADMINPASSWORD}}";
 
         // 修复 home 跳转
         document.addEventListener('DOMContentLoaded', function() {
